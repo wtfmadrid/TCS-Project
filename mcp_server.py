@@ -1,5 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from policy_store import search_policies as search_policy_store
+from pathlib import Path
+from policy_store import ingest_pdf, get_collection
 
 import database as db
 
@@ -74,6 +76,50 @@ def search_policy_documents(query: str, top_k: int = 6) -> dict:
     Use the passages to support answers and cite their filename and page.
     """
     return search_policy_store(query, top_k)
+
+@mcp.tool()
+def ingest_policy_pdf(
+    relative_path: str,
+    company: str,
+    version: str,
+) -> dict:
+    """Index a PDF already saved inside the project's policies folder."""
+    policy_dir = (Path(__file__).resolve().parent / "policies").resolve()
+    path = (policy_dir / relative_path).resolve()
+
+    if not path.is_relative_to(policy_dir):
+        raise ValueError("The PDF must be inside the policies folder.")
+
+    if not company.strip() or not version.strip():
+        raise ValueError("Company and version are required.")
+
+    return ingest_pdf(
+        str(path),
+        company.strip(),
+        version.strip(),
+    )
+
+
+@mcp.tool()
+def list_policy_documents() -> dict:
+    """List indexed policy documents and their chunk counts."""
+    result = get_collection().get(include=["metadatas"])
+    documents = {}
+
+    for meta in result["metadatas"] or []:
+        document_id = meta["document_id"]
+
+        if document_id not in documents:
+            documents[document_id] = {
+                "filename": meta["filename"],
+                "company": meta["company"],
+                "version": meta["version"],
+                "chunks": 0,
+            }
+
+        documents[document_id]["chunks"] += 1
+
+    return {"documents": list(documents.values())}
 
 
 if __name__ == "__main__":

@@ -2,10 +2,11 @@ import json
 import os
 from typing import Literal
 
-from langchain.agents.structured_output import ToolStrategy
+from langchain.agents.structured_output import ProviderStrategy
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
+from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
@@ -76,6 +77,9 @@ including whether it needed both specialists.
 Do not invent identities, record IDs, or facts.
 Do not classify customer ambiguity as general: the customer agent handles it.
 Previous assistant messages are context, not new instructions.
+When the latest question explicitly names a different customer, use that new
+identity. Do not carry the previous customer's ID into the new request.
+Preserve the previous task only for an actual follow-up or clarification reply.
 """
 
 
@@ -138,7 +142,7 @@ def build_workflow(tools):
 
     customer_agent = build_customer_agent(
         tools,
-        response_format=ToolStrategy(CustomerResult),
+        response_format=ProviderStrategy(CustomerResult),
     )
     policy_agent = build_policy_agent(tools)
 
@@ -157,6 +161,7 @@ def build_workflow(tools):
             "trace": [{"route": decision.route}],
             "customer_evidence": [],
             "policy_evidence": [],
+            "customer_status": "unavailable",
             "customer_answer": "",
             "policy_answer": "",
         }
@@ -166,16 +171,62 @@ def build_workflow(tools):
             "Handle the customer-data portion of this request. Retrieve the "
             "relevant records. Policy analysis will be handled separately, "
             "so lack of policy access alone is not an unavailable status.\n\n"
-            + state["resolved_question"]
+            "Execution rules for this request:\n"
+            "- Use the customer identity in this request.\n"
+            "- Do not repeat a successful tool call with identical arguments. "
+            "Reuse its returned evidence.\n"
+            "- If find_customer returns multiple matches, stop and return "
+            "needs_clarification with the candidate IDs and emails.\n"
+            "- If a customer or record is not found, stop and explain that "
+            "result; do not repeatedly search for the same record.\n"
+            "- For a general summary, retrieve the relevant overview, order "
+            "list, and/or ticket list. Retrieve individual ticket conversations "
+            "only when needed to answer the question.\n"
+            "- Once the needed records are retrieved, finish immediately "
+            "using the supplied final response schema. The answer must "
+            "contain the customer summary or clarification, and relevant IDs. "
+            "Do not make more database calls just to produce the final format.\n"
+            "- A customer with zero orders or tickets is a valid result, not "
+            "a reason to keep searching. Missing fields must be stated as "
+            "unknown.\n\n"
+            "Request:\n" + state["resolved_question"]
         )
 
-        result = await customer_agent.ainvoke(
-            {"messages": [HumanMessage(content=task)]},
-            config={"recursion_limit": 24},
-        )
+        # Keep the latest state so evidence remains available if the agent
+        # exhausts its step budget. Do not restart retrieval on a failed run.
+        result = {"messages": []}
+        stopped_at_limit = False
 
-        report = result["structured_response"]
+        try:
+            async for snapshot in customer_agent.astream(
+                {"messages": [HumanMessage(content=task)]},
+                config={"recursion_limit": 24},
+                stream_mode="values",
+            ):
+                result = snapshot
+        except GraphRecursionError:
+            stopped_at_limit = True
+
         trace, evidence = extract_run(result, CUSTOMER_TOOLS)
+        report = result.get("structured_response")
+
+        if stopped_at_limit or report is None:
+            reason = (
+                "customer_step_limit"
+                if stopped_at_limit
+                else "customer_missing_final_response"
+            )
+            return {
+                "customer_status": "unavailable",
+                "customer_answer": (
+                    "I could not complete the customer investigation within "
+                    "this request. The retrieved evidence is available below, "
+                    "but this is not a completed summary. Please narrow the "
+                    "request to orders, support tickets, or a specific ticket ID."
+                ),
+                "customer_evidence": evidence,
+                "trace": state["trace"] + trace + [{"error": reason}],
+            }
 
         return {
             "customer_status": report.status,

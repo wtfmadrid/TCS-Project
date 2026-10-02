@@ -2,8 +2,8 @@
 
 Generative AI Multi-Agent System | TCS Developer Assessment
 
-**GitHub repository:** REPLACE_WITH_GITHUB_REPOSITORY_URL  
-**Demo video:** REPLACE_WITH_DEMO_VIDEO_URL
+**GitHub repository:** (https://github.com/wtfmadrid/TCS-Project)
+**Demo video:** (https://drive.google.com/file/d/1cBbNbBnTZjI53ZxZ8TNO84vjjePScWzU/view?usp=sharing) 
 
 ## Overview
 
@@ -29,9 +29,7 @@ LangGraph coordinates a customer specialist and a policy specialist. An LLM rout
 
 ## Architecture
 
-![SupportDesk AI system architecture](docs/architecture.png)
-
-The editable diagram is available at [docs/architecture.svg](docs/architecture.svg).
+![SupportDesk AI system architecture](architecture.png)
 
 ### Query workflow
 

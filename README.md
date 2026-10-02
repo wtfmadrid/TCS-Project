@@ -3,6 +3,7 @@
 Generative AI Multi-Agent System | TCS Developer Assessment
 
 **GitHub repository:** (https://github.com/wtfmadrid/TCS-Project)
+
 **Demo video:** (https://drive.google.com/file/d/1cBbNbBnTZjI53ZxZ8TNO84vjjePScWzU/view?usp=sharing) 
 
 ## Overview
@@ -271,9 +272,3 @@ These checks support the demonstration; they do not constitute a measured LLM ac
 - The policy agent relies on retrieved passages. Its prompts request targeted follow-up searches and disclosure of insufficient evidence, but do not guarantee retrieval completeness.
 - Refund approval, record updates, outbound communication, and other operational actions are outside scope.
 - The June 2021 policy is a historical reference. Current policy verification is outside the demonstration.
-
-## Submission contents
-
-The repository should include the application source, deterministic seed/check scripts, dependency files, this README, and the `docs/` architecture files. Generated databases, Chroma storage, model caches, `.venv`, and the actual `.env` file should be excluded from Git. The setup instructions regenerate the local data and index.
-
-The demo video should show PDF indexing or the indexed-document list, a customer query, customer disambiguation and follow-up, a policy response with page citations, and a combined query with inspectable evidence. Replace both submission-link placeholders at the top of this README with the final URLs before submitting the GitHub repository.

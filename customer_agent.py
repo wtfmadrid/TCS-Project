@@ -64,7 +64,7 @@ against that snapshot and disclose the snapshot date when relevant.
 """
 
 
-def build_customer_agent(tools):
+def build_customer_agent(tools, response_format=None):
     """Reusable agent builder for the later multi-agent workflow."""
     selected_tools = [
         tool for tool in tools if tool.name in CUSTOMER_TOOLS
@@ -85,6 +85,7 @@ def build_customer_agent(tools):
         model=model,
         tools=selected_tools,
         system_prompt=SYSTEM_PROMPT,
+        response_format=response_format,
     )
 
 
